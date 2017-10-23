@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
 """ Classifier
-
-    ----------------Authors----------------
+    ----------------Contributors----------------
+    https://github.com/bhrigu123/classifier/graphs/contributors
+    ----------------Maintainer----------------
     Bhrigu Srivastava <captain.bhrigu@gmail.com>
-    ----------------Licence----------------
+    ----------------License----------------
     The MIT License [https://opensource.org/licenses/MIT]
-    Copyright (c) 2015 Bhrigu Srivastava http://bhrigu123.github.io
+    Copyright (c) 2015 Bhrigu Srivastava http://bhrigu.me
 
 """
 
@@ -17,7 +18,7 @@ import subprocess
 import sys
 
 
-VERSION = 'Classifier 1.99dev'
+VERSION = 'Classifier 2.0'
 DIRCONFFILE = '.classifier.conf'
 PLATFORM = sys.platform
 OS = os.name
@@ -59,10 +60,15 @@ class Classifier:
         self.parser.add_argument("-t", "--types", action='store_true',
                                  help="Show the current list of types and formats")
 
+        self.parser.add_argument("-rst", "--reset", action='store_true',
+                                 help="Reset the default Config file")
+        
+        """
         self.parser.add_argument("-r", "--recursive", action='store_true',
                                  help="Recursively search your source directory. " +
                                  "WARNING: Ensure you use the correct path as this " +
                                  "WILL move all files from your selected types.")
+        """        
 
         self.parser.add_argument("-st", "--specific-types", type=str, nargs='+',
                                  help="Move all file extensions, given in the args list, " +
@@ -90,27 +96,33 @@ class Classifier:
         self.checkconfig()
         self.run()
 
+    def create_default_config(self):
+        with open(CONFIG, "w") as conffile:
+            conffile.write("IGNORE: part, desktop\n" +
+                           "Music: mp3, aac, flac, ogg, wma, m4a, aiff, wav, amr\n" +
+                           "Videos: flv, ogv, avi, mp4, mpg, mpeg, 3gp, mkv, ts, webm, vob, wmv\n" +
+                           "Pictures: png, jpeg, gif, jpg, bmp, svg, webp, psd, tiff\n" +
+                           "Archives: rar, zip, 7z, gz, bz2, tar, dmg, tgz, xz, iso, cpio\n" +
+                           "Documents: txt, pdf, doc, docx, odf, xls, xlsv, xlsx, " +
+                           "ppt, pptx, ppsx, odp, odt, ods, md, json, csv\n" +
+                           "Books: mobi, epub, chm\n" +
+                           "DEBPackages: deb\n" +
+                           "Programs: exe, msi\n" +
+                           "RPMPackages: rpm")
+        print("CONFIG file created at: "+CONFIG)
+
     def checkconfig(self):
         """ create a default config if not available """
         if not os.path.isdir(os.path.dirname(CONFIG)):
             os.makedirs(os.path.dirname(CONFIG))
         if not os.path.isfile(CONFIG):
-            conffile = open(CONFIG, "w")
-            conffile.write("IGNORE:.part,.desktop\n" +
-                           "Music:.mp3,.aac,.flac,.ogg,.wma,.m4a,.aiff,.wav,.amr\n" +
-                           "Videos:.flv,.ogv,.avi,.mp4,.mpg,.mpeg,.3gp,.mkv,.ts,.webm,.vob,.wmv\n" +
-                           "Pictures:.png,.jpeg,.gif,.jpg,.bmp,.svg,.webp,.psd,.tiff\n" +
-                           "Archives:.rar,.zip,.7z,.gz,.bz2,.tar,.dmg,.tgz,.xz,.iso,.cpio\n" +
-                           "Documents:.txt,.pdf,.doc,.docx,.odf,.xls,.xlsv,.xlsx," +
-                           ".ppt,.pptx,.ppsx,.odp,.odt,.ods,.md,.json,.csv\n" +
-                           "Books:.mobi,.epub,.chm\n" +
-                           "DEBPackages:.deb\n" +
-                           "Programs:.exe,.msi\n" +
-                           "RPMPackages:.rpm")
-            conffile.close()
+            self.create_default_config()
+
         with open(CONFIG, 'r') as file:
             for items in file:
-                (key, val) = items.replace('\n', '').split(':')
+                spl = items.replace('\n', '').split(':')
+                key = spl[0].replace(" ","")
+                val = spl[1].replace(" ","")
                 self.formats[key] = val
         return
 
@@ -119,7 +131,7 @@ class Classifier:
         to_file = os.path.join(to_folder, filename)
         # to move only files, not folders
         if not to_file == from_file:
-            print('  moving:', to_file)
+            print('moved: ' + str(to_file))
             if os.path.isfile(from_file):
                 if not os.path.exists(to_folder):
                     os.makedirs(to_folder)
@@ -132,7 +144,7 @@ class Classifier:
             # set up a config per folder
             if not file == DIRCONFFILE and os.path.isfile(os.path.join(directory, file)):
                 filename, file_ext = os.path.splitext(file)
-                file_ext = file_ext.lower()
+                file_ext = file_ext.lower().replace('.', '')
                 if 'IGNORE' in self.formats:
                     for ignored in self.formats['IGNORE'].replace('\n', '').split(','):
                         if file_ext == ignored:
@@ -151,9 +163,10 @@ class Classifier:
                                         self.moveto(file, directory, folder)
                                     except Exception as e:
                                         print('Cannot move file - {} - {}'.format(file, str(e)))
+            """
             elif os.path.isdir(os.path.join(directory, file)) and self.args.recursive:
                 self.classify(self.formats, output, os.path.join(directory, file))
-
+            """
         return
 
     def classify_by_date(self, date_format, output, directory):
@@ -168,7 +181,6 @@ class Classifier:
             folder = os.path.join(output, folder)
             self.moveto(file, directory, folder)
 
-        print("Done!")
         return
 
     def _format_text_arg(self, arg):
@@ -185,21 +197,28 @@ class Classifier:
     def run(self):
         if self.args.version:
             # Show version information and quit
-            print(VERSION + '\n' + os.path.realpath(__file__))
+            print(VERSION)
             return False
+
         if self.args.types:
             # Show file format information then quit
             for key, value in self.formats.items():
-                print(key, '\n', value)
+                print(key + ': '+ value)
             return False
+
         if self.args.edittypes:
             if PLATFORM == 'darwin':
-                subprocess.call(('open', CONFIG))
+                subprocess.call(('open', '-t', CONFIG))
             elif PLATFORM == 'win32' or OS == 'nt':
                 os.startfile(CONFIG)
             elif PLATFORM == 'linux' or PLATFORM == 'linux2' or OS == 'posix':
                 subprocess.Popen(['xdg-open', CONFIG])
             return False
+
+        if self.args.reset:
+            self.create_default_config()
+            return
+
         if bool(self.args.specific_folder) ^ bool(self.args.specific_types):
             print(
                 'Specific Folder and Specific Types need to be specified together')
@@ -230,6 +249,12 @@ class Classifier:
         elif os.path.isfile(os.path.join(os.getcwd(), DIRCONFFILE)):
             self.dirconf = os.path.join(os.getcwd(), DIRCONFFILE)
 
+        if self.args.dateformat:
+            if not self.args.date:
+                print(
+                    'Dateformat -df must be given alongwith date -dt option')
+                sys.exit()
+
         if self.args.date:
             if self.args.dateformat:
                 self.classify_by_date(self.args.dateformat, output, directory)
@@ -247,20 +272,19 @@ class Classifier:
                     self.formats[key] = val.replace('\n', '').split(',')
                     print("\nScanning:  " + directory +
                           "\nFor:       " + key +
-                          '\nRecursive: ' + str(self.args.recursive) +
                           '\nFormats:   ' + val)
                     self.classify(self.formats, dst, directory)
                 except ValueError:
                     print("Your local config file is malformed. Please check and try again.")
                     return False
         else:
-            print("\nScanning Folder: " + directory +
-                  "\nFor: " + str(self.formats.items()) +
-                  '\nRecursive: ' + str(self.args.recursive))
+            print("\nScanning Folder: " + directory)
+            if self.args.specific_types:
+                print("For: " + str(self.formats.items()))
+            else:
+                print("Using the default CONFIG File\n")
             self.classify(self.formats, output, directory)
 
         print("Done!\n")
         return True
 
-
-main()
